@@ -28,6 +28,14 @@ For each market, from that case's own up-to-72h of 1-minute prices:
    own checkpoint prices.
 4. **Short-history fallback.** A Gaussian spread from the median
    absolute 1-minute move, floored at 0.0004 per √minute.
+5. **Minimum spread.** A market that has barely moved lately gets
+   empirical quantiles that collapse to near-zero width, and a single
+   jump then costs heavily at every outer quantile. The centred
+   quantiles are widened, never narrowed, to at least the width the
+   0.0004 floor would give (2 × 1.644854 × 0.0004 × √h across the
+   5%–95% band), so a quiet market still admits it can move. The floor
+   binds only when the empirical spread is narrower than it; on the
+   practice cases it changes the loss by +0.003.
 
 Deterministic, standard library only, no network. ~0.5 s per case
 (limit 8 s).
@@ -39,13 +47,13 @@ fetched from Polymarket's public price history:
 
 | case | this entry | house baseline |
 |------|-----------|----------------|
-| p00  | 0.446439  | 0.536138      |
-| p01  | 0.307473  | 0.380352      |
-| p02  | 0.346621  | 0.408408      |
-| p03  | 0.312896  | 0.368599      |
-| p04  | 0.194099  | 0.298794      |
-| p05  | 0.119903  | 0.238232      |
-| **overall** | **0.278459** | **0.363589 (−23.4%)** |
+| p00  | 0.446239  | 0.536138      |
+| p01  | 0.311619  | 0.380352      |
+| p02  | 0.348873  | 0.408408      |
+| p03  | 0.317289  | 0.368599      |
+| p04  | 0.192766  | 0.298794      |
+| p05  | 0.125758  | 0.238232      |
+| **overall** | **0.281016** | **0.363589 (−22.7%)** |
 
 Wins 6/6 practice cases. The local scorer reproduces the house-quoted
 baseline (0.363589) exactly. Note the practice is cut from the NVIDIA

@@ -25,12 +25,22 @@
 #      calibration while the final (sum far from 1) skips it.
 #   4. Fallback for short histories: a Gaussian spread from the median
 #      absolute 1-minute move, floored at 0.0004 per sqrt-minute.
+#   5. Minimum spread: a market that has barely moved lately gets
+#      empirical quantiles that collapse to near-zero width, and a single
+#      jump then costs heavily at every outer quantile.  The centred
+#      quantiles are widened, never narrowed, to at least the width the
+#      0.0004 floor would give (2 x 1.644854 x 0.0004 x sqrt(h) across
+#      the 5%-95% band), so a quiet market still admits it can move.
+#      The floor binds only when the empirical spread is narrower than
+#      it; measured on the practice cases it changes the loss by +0.003
+#      (0.278 -> 0.281).
 #
 # Practice loss (local backtest on the six practice cases, same pinball
 # scorer the house quotes, answers fetched from Polymarket's public
-# price history): 0.278459 vs house persistence baseline 0.363589
-# (-23.4%), wins 6/6 cases -- identical to the sibling NVIDIA forecaster
-# this is derived from, since the gate is on for every practice case.
+# price history): 0.281016 vs house persistence baseline 0.363589
+# (-22.7%), wins 6/6 cases -- derived from the sibling NVIDIA forecaster
+# (0.278459); the minimum-spread step costs +0.003 on practice but keeps
+# quiet markets honest.
 #
 # Deterministic: no randomness, no wall clock, no network; the same case
 # always writes the same bytes.  Python 3.13 standard library only.
@@ -150,6 +160,12 @@ def forecast_market(prices, horizon=240):
                 cq = [qh[lo][j] + w * (qh[hi][j] - qh[lo][j]) for j in range(5)]
         frac = h / horizon
         drift = (MOM_R5 * r5 + MOM_R60 * r60) * frac
+        # Minimum spread (step 5): widen, never narrow, to the floor width.
+        min_width = 2 * 1.644854 * SIG_FLOOR * math.sqrt(h)
+        width = cq[4] - cq[0]
+        if 0 < width < min_width:
+            s = min_width / width
+            cq = [v * s for v in cq]
         row = [clamp01(x + drift + v) for v in cq]
         for j in range(1, 5):
             if row[j] < row[j - 1]:
